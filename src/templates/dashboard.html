@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - MyApp{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto mt-10 p-4">
+    <!-- Notification (floating toast) -->
+    <div id="notification" class="hidden fixed top-4 right-4 z-50 max-w-sm">
+        <div id="notificationInner" class="rounded-md p-3 flex items-start gap-2 shadow transition transform hover:scale-[1.01]">
+            <svg id="notificationIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 mt-0.5"></svg>
+            <p id="notificationText" class="text-sm"></p>
+            <button type="button" id="notificationClose" class="ml-auto text-sm font-medium underline">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">Your Tasks</h1>
+        <button id="logoutBtn" class="text-sm text-gray-600 hover:text-gray-800 underline">Logout</button>
+    </div>
+
+    <!-- Filters -->
+    <div class="mt-4 flex items-center gap-2">
+        <label for="statusFilter" class="text-sm text-gray-700">Filter by status:</label>
+        <select id="statusFilter" class="border border-gray-300 rounded-md p-2 text-sm">
+            <option value="all" selected>All</option>
+            <option value="pending">Pending</option>
+            <option value="completed">Completed</option>
+        </select>
+    </div>
+
+    <!-- Add Task Form -->
+    <form id="addTaskForm" class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3 bg-white p-4 rounded-lg shadow">
+        <input id="taskTitle" type="text" placeholder="Title" required
+            class="col-span-1 md:col-span-1 border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+        <input id="taskDescription" type="text" placeholder="Description (optional)"
+            class="col-span-1 md:col-span-1 border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+        <button id="addTaskBtn" type="submit" class="col-span-1 bg-blue-600 text-white rounded-md px-4 py-2 hover:bg-blue-700">Add Task</button>
+    </form>
+
+    <!-- Tasks List -->
+    <div id="tasksContainer" class="mt-6 space-y-3"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // In-memory tasks cache for client-side filtering
+    let allTasks = [];
+    // Notification helpers
+    function showNotification(type, message) {
+        const wrapper = document.getElementById('notification');
+        const inner = document.getElementById('notificationInner');
+        const text = document.getElementById('notificationText');
+        const icon = document.getElementById('notificationIcon');
+        inner.className = 'rounded-md p-3 flex items-start gap-2 shadow transition transform hover:scale-[1.01]';
+        icon.className = 'w-5 h-5 mt-0.5';
+        const typeMap = {
+            success: {
+                classes: ['bg-green-50', 'text-green-800', 'border', 'border-green-200'],
+                icon: '<path fill-rule="evenodd" d="M10.28 3.22a.75.75 0 0 1 1.06 0l9 9a.75.75 0 0 1-1.06 1.06L11 5.06 4.72 11.34a.75.75 0 0 1-1.06-1.06l6.62-6.62Z" clip-rule="evenodd" />'
+            },
+            error: {
+                classes: ['bg-red-50', 'text-red-800', 'border', 'border-red-200'],
+                icon: '<path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm.75 6a.75.75 0 0 0-1.5 0v5.25a.75.75 0 0 0 1.5 0V8.25Zm0 7.5a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z" clip-rule="evenodd" />'
+            },
+            completed: {
+                classes: ['bg-emerald-50', 'text-emerald-800', 'border', 'border-emerald-200'],
+                icon: '<path fill-rule="evenodd" d="M9 12.75 11.25 15l3.75-4.5a.75.75 0 1 1 1.17.94l-4.25 5.1a.75.75 0 0 1-1.14.03L8.25 14.25a.75.75 0 1 1 1.06-1.06Z" clip-rule="evenodd" />'
+            },
+            pending: {
+                classes: ['bg-amber-50', 'text-amber-800', 'border', 'border-amber-200'],
+                icon: '<path fill-rule="evenodd" d="M12 2.25a9.75 9.75 0 1 0 9.75 9.75A9.761 9.761 0 0 0 12 2.25Zm.75 5.25a.75.75 0 0 0-1.5 0v4.5c0 .199.079.39.22.53l2.25 2.25a.75.75 0 1 0 1.06-1.06l-2.03-2.03V7.5Z" clip-rule="evenodd" />'
+            },
+            info: {
+                classes: ['bg-blue-50', 'text-blue-800', 'border', 'border-blue-200'],
+                icon: '<path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm.75 6a.75.75 0 0 0-1.5 0v5.25a.75.75 0 0 0 1.5 0V8.25Zm0 7.5a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z" clip-rule="evenodd" />'
+            }
+        };
+        const palette = typeMap[type] || typeMap.success;
+        inner.classList.add(...palette.classes);
+        icon.innerHTML = palette.icon;
+        text.textContent = message;
+        wrapper.classList.remove('hidden');
+        clearTimeout(window.__notifTimer);
+        window.__notifTimer = setTimeout(() => wrapper.classList.add('hidden'), 4000);
+
+        // Pause auto-hide on hover
+        if (!wrapper.__hoverBound) {
+            wrapper.addEventListener('mouseenter', () => {
+                if (window.__notifTimer) {
+                    clearTimeout(window.__notifTimer);
+                    window.__notifTimer = null;
+                }
+            });
+            wrapper.addEventListener('mouseleave', () => {
+                clearTimeout(window.__notifTimer);
+                window.__notifTimer = setTimeout(() => wrapper.classList.add('hidden'), 1500);
+            });
+            wrapper.__hoverBound = true;
+        }
+    }
+    document.addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'notificationClose') {
+            document.getElementById('notification').classList.add('hidden');
+        }
+    });
+
+    // JWT helpers
+    function getToken() {
+        const token = localStorage.getItem('jwt_token');
+        const exp = localStorage.getItem('jwt_expiry');
+        if (!token || !exp) return null;
+        if (new Date(exp) < new Date()) return null;
+        return token;
+    }
+    function authHeader() {
+        const t = getToken();
+        return t ? { Authorization: `Bearer ${t}` } : {};
+    }
+
+    // API endpoints
+    const TASKS_BASE = '{{ request.url_for("get_tasks") }}'.replace(/\/$/, ''); // remove trailing slash if any
+    // get_tasks resolves to /api/v1/tasks/ so we will use that as base.
+
+    async function fetchTasks() {
+        try {
+            const { data } = await axios.get(TASKS_BASE + '/', { headers: authHeader() });
+            allTasks = Array.isArray(data) ? data : [];
+            renderTasks(getFilteredTasks());
+        } catch (e) {
+            if (e.response?.status === 401) {
+                showNotification('error', 'Your session expired. Please login again.');
+            } else {
+                showNotification('error', e.response?.data?.detail || 'Failed to load tasks');
+            }
+        }
+    }
+
+    async function addTask(title, description) {
+        try {
+            await axios.post(TASKS_BASE + '/', { title, description: description || null }, { headers: authHeader() });
+            showNotification('success', 'Task added');
+            await fetchTasks();
+        } catch (e) {
+            showNotification('error', e.response?.data?.detail || 'Failed to add task');
+        }
+    }
+
+    async function updateTask(id, title, description, status) {
+        try {
+            await axios.put(`${TASKS_BASE}/${id}`, { title, description: description || null, status }, { headers: authHeader() });
+            const nt = status === 'completed' ? 'completed' : (status === 'pending' ? 'pending' : 'success');
+            const msg = status === 'completed' ? 'Task marked as completed' : (status === 'pending' ? 'Task marked as pending' : 'Task updated');
+            showNotification(nt, msg);
+            await fetchTasks();
+        } catch (e) {
+            showNotification('error', e.response?.data?.detail || 'Failed to update task');
+        }
+    }
+
+    async function deleteTask(id) {
+        try {
+            await axios.delete(`${TASKS_BASE}/${id}`, { headers: authHeader() });
+            showNotification('success', 'Task deleted');
+            await fetchTasks();
+        } catch (e) {
+            showNotification('error', e.response?.data?.detail || 'Failed to delete task');
+        }
+    }
+
+    // Render tasks
+    function renderTasks(tasks) {
+        const container = document.getElementById('tasksContainer');
+        if (!tasks || tasks.length === 0) {
+            container.innerHTML = '<div class="text-gray-500">No tasks yet. Add one above.</div>';
+            return;
+        }
+        container.innerHTML = tasks.map(t => {
+            const status = (t.status || 'pending').toLowerCase();
+            const isPending = status === 'pending';
+            const isCompleted = status === 'completed';
+            const cardAccent = isCompleted ? 'border-emerald-500' : 'border-amber-500';
+            const selectColor = isCompleted
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-amber-50 text-amber-700 border-amber-200';
+            return `
+            <div class="bg-white p-4 rounded-lg shadow flex flex-col md:flex-row md:items-center gap-3 border-l-4 ${cardAccent}" data-card-id="${t.id}">
+                <div class="flex-1">
+                    <input data-id="${t.id}" data-field="title" data-original="${escapeHtml(t.title)}" class="w-full font-medium border border-transparent focus:border-gray-300 rounded px-2 py-1" value="${escapeHtml(t.title)}" />
+                    <input data-id="${t.id}" data-field="description" data-original="${escapeHtml(t.description || '')}" class="w-full mt-1 text-sm text-gray-600 border border-transparent focus:border-gray-300 rounded px-2 py-1" placeholder="Description" value="${escapeHtml(t.description || '')}" />
+                    <div class="mt-2">
+                        <label class="text-xs text-gray-600 mr-2">Status:</label>
+                        <select data-id="${t.id}" data-field="status" data-original="${status}" class="border rounded px-2 py-1 text-sm ${selectColor}">
+                            <option value="pending" ${isPending ? 'selected' : ''}>Pending</option>
+                            <option value="completed" ${isCompleted ? 'selected' : ''}>Completed</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-2 md:ml-3">
+                    <button data-action="save" data-id="${t.id}" class="px-3 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 opacity-50 cursor-not-allowed" disabled>Save</button>
+                    <button data-action="delete" data-id="${t.id}" class="px-3 py-2 rounded-md bg-red-600 text-white hover:bg-red-700">Delete</button>
+                </div>
+            </div>
+        `;
+        }).join('');
+
+        // After rendering, ensure initial dirty state is clean (save disabled, no unsaved indicator)
+        tasks.forEach(t => setCardDirty(`${t.id}`, false));
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    // Event handlers
+    document.getElementById('addTaskForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const title = document.getElementById('taskTitle').value.trim();
+        const description = document.getElementById('taskDescription').value.trim();
+        if (!title) {
+            showNotification('error', 'Title is required');
+            return;
+        }
+        const btn = document.getElementById('addTaskBtn');
+        btn.disabled = true; btn.classList.add('opacity-70');
+        await addTask(title, description);
+        btn.disabled = false; btn.classList.remove('opacity-70');
+        document.getElementById('addTaskForm').reset();
+    });
+
+    document.getElementById('tasksContainer').addEventListener('click', async (e) => {
+        const act = e.target?.getAttribute?.('data-action');
+        if (!act) return;
+        const id = e.target.getAttribute('data-id');
+        if (act === 'delete') {
+            await deleteTask(id);
+        } else if (act === 'save') {
+            const titleEl = document.querySelector(`input[data-id="${id}"][data-field="title"]`);
+            const descEl = document.querySelector(`input[data-id="${id}"][data-field="description"]`);
+            const statusEl = document.querySelector(`select[data-id="${id}"][data-field="status"]`);
+            const title = titleEl.value.trim();
+            const description = descEl.value.trim();
+            const status = (statusEl?.value || 'pending').toLowerCase();
+            if (!title) {
+                showNotification('error', 'Title is required');
+                return;
+            }
+            // Prevent double submit
+            const saveBtn = document.querySelector(`button[data-action="save"][data-id="${id}"]`);
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.classList.add('opacity-50', 'cursor-not-allowed'); }
+            await updateTask(id, title, description, status);
+        }
+    });
+
+    // Detect edits to enable Save and show unsaved indicator
+    document.getElementById('tasksContainer').addEventListener('input', (e) => {
+        const target = e.target;
+        if (!target || !target.getAttribute) return;
+        const id = target.getAttribute('data-id');
+        const field = target.getAttribute('data-field');
+        if (!id || !field) return;
+        updateCardDirtyState(id);
+    });
+    document.getElementById('tasksContainer').addEventListener('change', (e) => {
+        const target = e.target;
+        if (!target || !target.getAttribute) return;
+        const id = target.getAttribute('data-id');
+        const field = target.getAttribute('data-field');
+        if (!id || !field) return;
+        updateCardDirtyState(id);
+    });
+
+    function updateCardDirtyState(id) {
+        const titleEl = document.querySelector(`input[data-id="${id}"][data-field="title"]`);
+        const descEl = document.querySelector(`input[data-id="${id}"][data-field="description"]`);
+        const statusEl = document.querySelector(`select[data-id="${id}"][data-field="status"]`);
+        if (!titleEl || !descEl || !statusEl) return;
+        const origTitle = titleEl.getAttribute('data-original') ?? '';
+        const origDesc = descEl.getAttribute('data-original') ?? '';
+        const origStatus = (statusEl.getAttribute('data-original') ?? 'pending').toLowerCase();
+        const curTitle = titleEl.value.trim();
+        const curDesc = descEl.value.trim();
+        const curStatus = (statusEl.value || 'pending').toLowerCase();
+        const dirty = (curTitle !== origTitle) || (curDesc !== origDesc) || (curStatus !== origStatus);
+        setCardDirty(id, dirty);
+    }
+
+    function setCardDirty(id, dirty) {
+        const card = document.querySelector(`[data-card-id="${id}"]`);
+        const saveBtn = document.querySelector(`button[data-action="save"][data-id="${id}"]`);
+        if (saveBtn) {
+            saveBtn.disabled = !dirty;
+            if (dirty) {
+                saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+        if (card) {
+            // Add a vertical line on the right to indicate unsaved changes
+            if (dirty) {
+                card.classList.add('border-r-4', 'border-sky-500');
+            } else {
+                card.classList.remove('border-r-4', 'border-sky-500');
+            }
+        }
+    }
+
+    // Filtering logic
+    function getFilteredTasks() {
+        const sel = document.getElementById('statusFilter');
+        const val = sel ? sel.value : 'all';
+        if (val === 'all') return allTasks;
+        return allTasks.filter(t => (t.status || 'pending').toLowerCase() === val);
+    }
+    const statusFilterEl = document.getElementById('statusFilter');
+    if (statusFilterEl) {
+        statusFilterEl.addEventListener('change', () => {
+            renderTasks(getFilteredTasks());
+        });
+    }
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        localStorage.removeItem('jwt_token');
+        localStorage.removeItem('jwt_expiry');
+        window.location.href = '{{ request.url_for("read_root") }}';
+    });
+
+    // Initial load: redirect to login if missing token
+    (function init() {
+        if (!getToken()) {
+            showNotification('error', 'Please login first.');
+            setTimeout(() => { window.location.href = '{{ request.url_for("read_root") }}'; }, 1200);
+            return;
+        }
+        fetchTasks();
+    })();
+</script>
+{% endblock %}

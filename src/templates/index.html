@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Login / Register - MyApp{% endblock %}
+
+{% block content %}
+<div class="flex justify-center items-center mt-20">
+    <div class="w-full max-w-md bg-white shadow-md rounded-lg p-6 relative">
+
+        <!-- Notification -->
+        <div id="notification" class="hidden absolute -top-4 left-1/2 -translate-x-1/2 w-[calc(100%+2rem)]">
+            <div class="mx-auto px-4">
+                <div id="notificationInner" class="rounded-md p-3 flex items-start gap-2 shadow">
+                    <svg id="notificationIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 mt-0.5"></svg>
+                    <p id="notificationText" class="text-sm"></p>
+                    <button type="button" id="notificationClose" class="ml-auto text-sm font-medium underline">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex border-b">
+            <button id="loginTab" class="tab-btn px-4 py-2 -mb-px border-b-2 border-blue-600 text-blue-700 font-medium">Login</button>
+            <button id="registerTab" class="tab-btn px-4 py-2 -mb-px border-b-2 border-transparent text-gray-600 hover:text-gray-800">Register</button>
+        </div>
+
+        <!-- Login Panel -->
+        <div id="loginPanel" class="mt-4">
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label for="loginEmail" class="block text-gray-700">Email</label>
+                    <input type="email" id="loginEmail" name="email" required
+                        class="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label for="loginPassword" class="block text-gray-700">Password</label>
+                    <input type="password" id="loginPassword" name="password" required
+                        class="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                </div>
+                <button type="submit" id="loginSubmit" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition">
+                    Login
+                </button>
+            </form>
+        </div>
+
+        <!-- Register Panel -->
+        <div id="registerPanel" class="mt-4 hidden">
+            <form id="registerForm" class="space-y-4">
+                <div>
+                    <label for="registerEmail" class="block text-gray-700">Email</label>
+                    <input type="email" id="registerEmail" name="email" required
+                        class="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-green-500">
+                </div>
+                <div>
+                    <label for="registerPassword" class="block text-gray-700">Password</label>
+                    <input type="password" id="registerPassword" name="password" required
+                        class="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-green-500">
+                </div>
+                <button type="submit" id="registerSubmit" class="w-full bg-green-600 text-white p-2 rounded-md hover:bg-green-700 transition">
+                    Register
+                </button>
+            </form>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Simple notification utility (success / error)
+    function showNotification(type, message) {
+        const wrapper = document.getElementById('notification');
+        const inner = document.getElementById('notificationInner');
+        const text = document.getElementById('notificationText');
+        const icon = document.getElementById('notificationIcon');
+
+        // Reset classes
+        inner.className = 'rounded-md p-3 flex items-start gap-2 shadow';
+        icon.className = 'w-5 h-5 mt-0.5';
+
+        if (type === 'success') {
+            inner.classList.add('bg-green-50', 'text-green-800', 'border', 'border-green-200');
+            icon.innerHTML = '<path fill-rule="evenodd" d="M10.28 3.22a.75.75 0 0 1 1.06 0l9 9a.75.75 0 0 1-1.06 1.06L11 5.06 4.72 11.34a.75.75 0 0 1-1.06-1.06l6.62-6.62Z" clip-rule="evenodd" />';
+        } else {
+            inner.classList.add('bg-red-50', 'text-red-800', 'border', 'border-red-200');
+            icon.innerHTML = '<path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm.75 6a.75.75 0 0 0-1.5 0v5.25a.75.75 0 0 0 1.5 0V8.25Zm0 7.5a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z" clip-rule="evenodd" />';
+        }
+
+        text.textContent = message;
+        wrapper.classList.remove('hidden');
+
+        // Auto hide after 4s
+        clearTimeout(window.__notifTimer);
+        window.__notifTimer = setTimeout(() => {
+            wrapper.classList.add('hidden');
+        }, 4000);
+    }
+
+    document.getElementById('notificationClose').addEventListener('click', () => {
+        document.getElementById('notification').classList.add('hidden');
+    });
+
+    // Tabs logic
+    const loginTab = document.getElementById('loginTab');
+    const registerTab = document.getElementById('registerTab');
+    const loginPanel = document.getElementById('loginPanel');
+    const registerPanel = document.getElementById('registerPanel');
+
+    function activateTab(which) {
+        if (which === 'login') {
+            loginTab.className = 'tab-btn px-4 py-2 -mb-px border-b-2 border-blue-600 text-blue-700 font-medium';
+            registerTab.className = 'tab-btn px-4 py-2 -mb-px border-b-2 border-transparent text-gray-600 hover:text-gray-800';
+            loginPanel.classList.remove('hidden');
+            registerPanel.classList.add('hidden');
+        } else {
+            registerTab.className = 'tab-btn px-4 py-2 -mb-px border-b-2 border-green-600 text-green-700 font-medium';
+            loginTab.className = 'tab-btn px-4 py-2 -mb-px border-b-2 border-transparent text-gray-600 hover:text-gray-800';
+            registerPanel.classList.remove('hidden');
+            loginPanel.classList.add('hidden');
+        }
+    }
+    loginTab.addEventListener('click', () => activateTab('login'));
+    registerTab.addEventListener('click', () => activateTab('register'));
+
+    function saveToken(token) {
+        const now = new Date();
+        const expire = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 1 day
+        localStorage.setItem('jwt_token', token);
+        localStorage.setItem('jwt_expiry', expire.toISOString());
+    }
+
+    // Login Form
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        const btn = document.getElementById('loginSubmit');
+        btn.disabled = true; btn.classList.add('opacity-70');
+
+        try {
+            const response = await axios.post('{{ request.url_for("login_user") }}', { email, password });
+            if (response.data.success) {
+                saveToken(response.data.token);
+                showNotification('success', 'Login successful! Redirecting...');
+                window.location.href = '{{ request.url_for("dashboard") }}';
+            } else {
+                showNotification('error', response.data.message || 'Login failed');
+            }
+        } catch (err) {
+            showNotification('error', err.response?.data?.message || 'Login error');
+        }
+        btn.disabled = false; btn.classList.remove('opacity-70');
+    });
+
+    // Register Form
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('registerEmail').value;
+        const password = document.getElementById('registerPassword').value;
+        const btn = document.getElementById('registerSubmit');
+        btn.disabled = true; btn.classList.add('opacity-70');
+
+        try {
+            const response = await axios.post('{{ request.url_for("register_user") }}', { email, password });
+            if (response.data.success) {
+                showNotification('success', 'Registration successful! You can login now.');
+                document.getElementById('registerForm').reset();
+                // Switch to login tab and pre-fill email
+                document.getElementById('loginEmail').value = email;
+                activateTab('login');
+            } else {
+                showNotification('error', response.data.message || 'Registration failed');
+            }
+        } catch (err) {
+            showNotification('error', err.response?.data?.message || 'Registration error');
+        }
+        btn.disabled = false; btn.classList.remove('opacity-70');
+    });
+</script>
+{% endblock %}
